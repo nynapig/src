@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from src.config import conf
 # [Test Needed] Spectral Normalization for Discriminator
 # Spectral Normalization on Conv Start
-
+#123
 
 
 class ConvSNRelu(nn.Module):
