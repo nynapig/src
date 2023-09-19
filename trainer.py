@@ -24,8 +24,8 @@ class Trainer(object):
 
     def train_one_epoch(self, epoch):
         epoch_reconstruction_loss = 0.0
-        epoch_lgs = 0.0
-        epoch_lds = 0.0
+        g_loss = 0.0
+        d_loss = 0.0
         cnt = 0
         for (
             protype_img,
@@ -106,7 +106,7 @@ class Trainer(object):
             epoch_reconstruction_loss += (
                 criterion_G.reconstruction_loss.item() / conf.lambda_l1
             )
-            epoch_lgs += L_G.item()
+            g_loss += L_G.item()
 
             L_G.backward(retain_graph=True)  
             self.optimizer_G.step()
@@ -149,12 +149,12 @@ class Trainer(object):
                     cls_enc_p,
                     cls_enc_s,
                 )
-            epoch_lds += L_D.item()
+            d_loss += L_D.item()
             L_D.backward()
             self.optimizer_D.step()
         epoch_reconstruction_loss /= len(self.train_loader)
-        epoch_lgs /= len(self.train_loader)
-        epoch_lds /= len(self.train_loader)
+        g_loss /= len(self.train_loader)
+        d_loss /= len(self.train_loader)
         fake_image = torchvision.utils.make_grid(x_fake)
         real_image = torchvision.utils.make_grid(x_real)
         src_image = torchvision.utils.make_grid(x1)
@@ -164,8 +164,8 @@ class Trainer(object):
         self.writer.add_scalars(
             "losses",
             {
-                "G_LOSS": epoch_lgs,
-                "D_LOSS": epoch_lds,
+                "G_LOSS": g_loss,
+                "D_LOSS": d_loss,
                 "train_reconstruction": epoch_reconstruction_loss,
             },
             epoch,
