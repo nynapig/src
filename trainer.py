@@ -23,10 +23,10 @@ class Trainer(object):
         self.writer = SummaryWriter("./log/" + conf.title + conf.time_stamp)
 
     def train_one_epoch(self, epoch):
-        epoch_reconstruction_loss = 0.0
+        reconstruction_loss = 0.0
         g_loss = 0.0
         d_loss = 0.0
-        cnt = 0
+        count = 0
         for (
             protype_img,
             index,
@@ -35,9 +35,9 @@ class Trainer(object):
             style_character_index,
             real_img,
         ) in tqdm(self.train_loader, total=len(self.train_loader)):
-            if cnt == len(self.train_loader):
+            if count == len(self.train_loader):
                 break
-            cnt += 1
+            count += 1
             x1 = protype_img.to(conf.device)
             x2 = style_img.to(conf.device)
             x_real = real_img.to(conf.device)
@@ -46,27 +46,19 @@ class Trainer(object):
                 [
                     conf.num_fonts for i in range(x1.shape[0])
                 ]  
-            ).to(
-                conf.device
-            )  # 假的風格標籤
+            ).to(conf.device)  # 假的風格標籤
             char_label = index.to(conf.device)  # 真實的字形標籤
             fake_char_label = torch.tensor(
                 [conf.num_chars for i in range(x1.shape[0])]
-            ).to(
-                conf.device
-            )  # 假的字形標籤
+            ).to(conf.device)  # 假的字形標籤
             
-            real_label = torch.tensor([1 for i in range(x1.shape[0])]).to(
-                conf.device
-            )  # 真樣本標籤
+            real_label = torch.tensor([1 for i in range(x1.shape[0])]).to(conf.device)  # 真樣本標籤
             
-            fake_label = torch.tensor([0 for i in range(x1.shape[0])]).to(
-                conf.device
-            )  # 假樣本標籤
+            fake_label = torch.tensor([0 for i in range(x1.shape[0])]).to(conf.device)  # 假樣本標籤
             
 
             self.optimizer_G.zero_grad()
-            x_fake, lout, rout = self.G(x1, x2)
+            x_fake, left_out, righ_out = self.G(x1, x2)
             out = self.D(x_fake, x1, x2)
             out_real_ = self.D(x_real, x1, x2)  
             
@@ -75,8 +67,8 @@ class Trainer(object):
             features_map_real = self.vgg16(x_real)
 
             # 兩邊encoder之後接一個分類器
-            cls_enc_p = self.CLSP(lout.view(-1, 512))
-            cls_enc_s = self.CLSS(rout.view(-1, 512))
+            cls_enc_p = self.CLSP(left_out.view(-1, 512))
+            cls_enc_s = self.CLSS(righ_out.view(-1, 512))
 
             # fake和real通過兩個encoder得到的向量應該相同
            
@@ -103,9 +95,7 @@ class Trainer(object):
                 cls_enc_s
                 
             )
-            epoch_reconstruction_loss += (
-                criterion_G.reconstruction_loss.item() / conf.lambda_l1
-            )
+            reconstruction_loss += (criterion_G.reconstruction_loss.item() / conf.lambda_l1)
             g_loss += L_G.item()
 
             L_G.backward(retain_graph=True)  
@@ -114,8 +104,8 @@ class Trainer(object):
             self.optimizer_D.zero_grad()
             out_real = self.D(x_real, x1, x2)
             out_fake = self.D(x_fake.detach(), x1, x2)
-            cls_enc_p = self.CLSP(lout.view(-1, 512).detach())
-            cls_enc_s = self.CLSS(rout.view(-1, 512).detach())
+            cls_enc_p = self.CLSP(left_out.view(-1, 512).detach())
+            cls_enc_s = self.CLSS(righ_out.view(-1, 512).detach())
 
             # 真假分類損失，風格分類損失，兩個encoder提取到的特徵質量損失
             if conf.label_smoothing:
@@ -152,7 +142,7 @@ class Trainer(object):
             d_loss += L_D.item()
             L_D.backward()
             self.optimizer_D.step()
-        epoch_reconstruction_loss /= len(self.train_loader)
+        reconstruction_loss /= len(self.train_loader)
         g_loss /= len(self.train_loader)
         d_loss /= len(self.train_loader)
         fake_image = torchvision.utils.make_grid(x_fake)
@@ -166,7 +156,7 @@ class Trainer(object):
             {
                 "G_LOSS": g_loss,
                 "D_LOSS": d_loss,
-                "train_reconstruction": epoch_reconstruction_loss,
+                "train_reconstruction": reconstruction_loss,
             },
             epoch,
         )
@@ -284,7 +274,7 @@ class Trainer(object):
         with torch.no_grad():
             self.G.eval()
             losses = []
-            cnt = 0
+            count = 0
             for (
                 protype_img,
                 index,
@@ -293,13 +283,13 @@ class Trainer(object):
                 style_character_index,
                 real_img,
             ) in tqdm(self.valid_loader, total=len(self.valid_loader)):
-                if cnt == len(self.valid_loader):
+                if count == len(self.valid_loader):
                     break
-                cnt += 1
+                count += 1
                 x1 = protype_img.to(conf.device)
                 x2 = style_img.to(conf.device)
                 x_real = real_img.to(conf.device)
-                x_fake, lout, rout = self.G(x1, x2)
+                x_fake, left_out, righ_out = self.G(x1, x2)
                 if conf.reconstruction_loss_type == "l1":
                     reconstruction_loss = nn.L1Loss()(x_fake, x_real)
                 elif conf.reconstruction_loss_type == "dice":
