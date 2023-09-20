@@ -366,21 +366,18 @@ class Discriminator(nn.Module):
     def __init__(self, num_fonts=21, num_characters=conf.num_chars+1):
         super(Discriminator, self).__init__()
         
+        self.pool = nn.MaxPool2d(3, stride=2, padding=1)   
+        self.conv1 = ConvSNRelu(3, 32,  ks=5, pad=2, s=1, spec=False) #64 64
+        self.conv2 = ConvSNRelu(32, 64  ,  ks=5, pad=2, s=1, spec=True) #64 64
+        self.conv3 = ConvSNRelu(64  , 64 * 2,  ks=5, pad=2, s=1, spec=True) #64 64
+        self.conv4 = ConvSNRelu(64 * 2, 64 * 2,  ks=5, pad=2, s=1, spec=True) #64 64
         
-        self.conv1 = ConvSNRelu(3, 64,  ks=5, pad=2, s=2, spec=False)
-        self.conv2 = ConvSNRelu(64, 64 * 2,  ks=5, pad=2, s=2, spec=True)
-        self.conv3 = ConvSNRelu(64 * 2, 64 * 4,  ks=5, pad=2, s=2, spec=True)
-        self.conv4 = ConvSNRelu(64 * 4, 64 * 8,  ks=5, pad=2, s=1, spec=True)
-        self.conv5 = ConvSNRelu(64 * 8, 64 * 16,  ks=5, pad=2, s=1, spec=True)
-        #self.conv6 = ConvSNLRelu(64 * 16, 64 * 32, 8, 8, ks=5, pad=2, s=1, spec=True)
-        '''
-        self.conv1 = ConvSNRelu(3, 32,  ks=5, pad=2, s=2, spec=False)
-        self.conv2 = ConvSNRelu(32, 32 * 2,  ks=5, pad=2, s=2, spec=True)
-        self.conv3 = ConvSNRelu(32 * 2, 32 * 4,  ks=5, pad=2, s=2, spec=True)
-        self.conv4 = ConvSNRelu(32 * 4, 32 * 8,  ks=5, pad=2, s=1, spec=True)
-        self.conv5 = ConvSNRelu(32 * 8, 32 * 16,  ks=5, pad=2, s=1, spec=True)
-        self.conv5 = ConvSNRelu(32 * 16, 32 * 32,  ks=5, pad=2, s=1, spec=True)
-        '''
+        self.conv5 = ConvSNRelu(64 * 2, 64 * 4,  ks=5, pad=2, s=2, spec=True) #32 16
+        self.conv6 = ConvSNRelu(64 * 4, 64 * 8,  ks=5, pad=2, s=2, spec=True) #16 8
+        self.conv7 = ConvSNRelu(64 * 8, 64 * 16,  ks=5, pad=2, s=2, spec=True) #8 4
+        self.conv8 = ConvSNRelu(64 * 16, 64 * 16,  ks=5, pad=2, s=2, spec=True) #4 2
+
+       
         
         self.fc1 = nn.Linear(1024 * 8 * 8, 1)
         self.fc2 = nn.Linear(1024 * 8 * 8, num_fonts)
@@ -390,17 +387,18 @@ class Discriminator(nn.Module):
         x = torch.cat([x1, x2, x3], dim=1)
         features = []
         x = self.conv1(x)
-        features.append(x)
         x = self.conv2(x)
-        features.append(x)
         x = self.conv3(x)
-        features.append(x)
         x = self.conv4(x)
-        features.append(x)
+        x = self.pool(x)
         x = self.conv5(x)
-        features.append(x)
-        #x = self.conv6(x)
-        #features.append(x)
+        x = self.conv6(x)
+        x = self.conv7(x)
+        x = self.conv8(x)
+        x = self.pool(x)
+
+
+
 
         x = x.view(-1, 1024 * 8 * 8)
         x1 = torch.sigmoid(self.fc1(x))  # real or fake
