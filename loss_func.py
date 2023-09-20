@@ -6,28 +6,7 @@ import torch.nn.functional as F
 from src.config import conf
 
 
-class LabelSmoothing(nn.Module):
-    """
-    NLL loss with label smoothing.
-    """
 
-    def __init__(self, smoothing=0.1):
-        """
-        Constructor for the LabelSmoothing module.
-        :param smoothing: label smoothing factor
-        """
-        super(LabelSmoothing, self).__init__()
-        self.confidence = 1.0 - smoothing
-        self.smoothing = smoothing
-
-    def forward(self, x, target):
-        logprobs = torch.nn.functional.log_softmax(x, dim=-1)
-
-        nll_loss = -logprobs.gather(dim=-1, index=target.unsqueeze(1))
-        nll_loss = nll_loss.squeeze(1)
-        smooth_loss = -logprobs.mean(dim=-1)
-        loss = self.confidence * nll_loss + self.smoothing * smooth_loss
-        return loss.mean()
 
 
 class DiceLoss(nn.Module):
@@ -88,10 +67,12 @@ def calc_gradient_penalty(D, x_real, x_fake, x1, x2):
 class GenerationLoss(nn.Module):
     def __init__(self):
         super(GenerationLoss, self).__init__()
+        self.cls_criteron = nn.CrossEntropyLoss()
+        smooth_value = 0.0
         if conf.label_smoothing:
-            self.cls_criteron = LabelSmoothing()
+            smooth_value = 0.1
         else:
-            self.cls_criteron = nn.CrossEntropyLoss()
+            smooth_value = 0.0
 
     def forward(
         self,
@@ -117,10 +98,10 @@ class GenerationLoss(nn.Module):
             out[0], real_label.float()
         )
         self.style_category_loss = conf.beta_d * self.cls_criteron(
-            out[1], real_style_label
+            out[1], real_style_label, label_smoothing = smooth_value
         )
         self.char_category_loss = conf.beta_d * self.cls_criteron(
-            out[2], char_label
+            out[2], char_label, label_smoothing = smooth_value
         )
 
         if conf.reconstruction_loss_type == "dice":
@@ -147,10 +128,10 @@ class GenerationLoss(nn.Module):
             encoder_out_real_right, encoder_out_fake_right
         )
         self.content_category_loss = conf.beta_p * self.cls_criteron(
-            cls_enc_p, char_label
+            cls_enc_p, char_label, label_smoothing = smooth_value
         )  # category loss for content prototype encoder
         self.style_category_loss = conf.beta_r * self.cls_criteron(
-            cls_enc_s, real_style_label
+            cls_enc_s, real_style_label, label_smoothing = smooth_value
         )
         return (
             self.real_fake_loss
@@ -168,10 +149,12 @@ class GenerationLoss(nn.Module):
 class DiscriminationLoss(nn.Module):
     def __init__(self):
         super(DiscriminationLoss, self).__init__()
+        self.cls_criteron = nn.CrossEntropyLoss()
+        smooth_value = 0.0
         if conf.label_smoothing:
-            self.cls_criteron = LabelSmoothing()
+            smooth_value = 0.1
         else:
-            self.cls_criteron = nn.CrossEntropyLoss()
+            smooth_value = 0.0
 
     def forward(
         self,
@@ -198,22 +181,22 @@ class DiscriminationLoss(nn.Module):
             out_fake[0], fake_label.float()
         )  # fake or real loss
         self.real_style_loss = conf.beta_d * self.cls_criteron(
-            out_real[1], real_style_label
+            out_real[1], real_style_label, label_smoothing = smooth_value
         )  # style category loss
         self.fake_style_loss = conf.beta_d * self.cls_criteron(
-            out_fake[1], fake_style_label
+            out_fake[1], fake_style_label, label_smoothing = smooth_value
         )  # style category loss
         self.real_char_category_loss = conf.beta_d * self.cls_criteron(
-            out_real[2], char_label
+            out_real[2], char_label, label_smoothing = smooth_value
         )  # char category loss
         self.fake_char_category_loss = conf.beta_d * self.cls_criteron(
-            out_fake[2], fake_char_label
+            out_fake[2], fake_char_label, label_smoothing = smooth_value
         )  # char category loss
         self.content_category_loss = conf.beta_p * self.cls_criteron(
-            cls_enc_p, char_label
+            cls_enc_p, char_label, label_smoothing = smooth_value
         )
         self.style_category_loss = conf.beta_r * self.cls_criteron(
-            cls_enc_s, real_style_label
+            cls_enc_s, real_style_label, label_smoothing = smooth_value
         )
         
         self.gradient_penalty = conf.alpha_GP * calc_gradient_penalty(
